@@ -75,6 +75,11 @@ module.exports = {
         css: {
           fontSize: "5rem"
         }
+      },
+      "ultraXL": {
+        css: {
+          fontSize: "12.5rem"
+        }
       }
     }
   },

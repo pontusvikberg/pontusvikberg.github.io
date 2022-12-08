@@ -1,10 +1,11 @@
-import React, { useEffect, useRef } from 'react'
-import { projects } from '../data'
-import CoverImage from './common/CoverImage'
-import DownArrow from './common/DownArrow'
-import LocomotiveScroll from "locomotive-scroll";
-import "locomotive-scroll/dist/locomotive-scroll.css";
-import imagesLoaded from "imagesloaded";
+import * as React from 'react';
+import LocomotiveScroll from 'locomotive-scroll';
+import DownArrow from './common/DownArrow';
+import { projects } from '../data';
+import CoverImage from './common/CoverImage';
+import * as THREE from 'three';
+import useReadingProgress from './common/UseReadingProgress';
+
 const clamp = (value: number, min: number, max: number) => value < min ? min : value > max ? max : value;
 const preloadImages = (selector: any) => {
     return new Promise((resolve) => {
@@ -16,78 +17,101 @@ const preloadImages = (selector: any) => {
     });
 };
 
-const Showcase = () => {
+const Showcase: React.FC = () => {
     const scrollRef = React.useRef<LocomotiveScroll | null>(null);
-    const ref = useRef(null);
-    const showcaseRef = useRef<HTMLDivElement>(null);
-    const scroll = useRef({
+    const showcaseRef = React.useRef<HTMLDivElement>(null);
+    const videoContainerRef = React.useRef<HTMLDivElement>(null);
+    const [completion, setCompletion] = React.useState(0);
+    const scroll = React.useRef({
         cache: 0,
         current: 0
     });
 
+    const updateScrollCompletion = (obj: LocomotiveScroll.OnScrollEvent) => {
+        const currentProgress = obj.scroll.y;
+        const scrollHeight = document.body.scrollHeight - window.innerHeight;
+        console.log('scrollh', scrollHeight)
+        if (scrollHeight) {
+            setCompletion(
+                Number((currentProgress / scrollHeight).toFixed(2)) * 100
+            );
+        }
+    }
 
-
-    useEffect(() => {
-
+    React.useEffect(() => {
+        // Create a new instance of LocomotiveScroll with the elements to scroll
         scrollRef.current = new LocomotiveScroll({
-            el: document.querySelector('#scrollArea') as any,
+            el: document.querySelector('#scroll-container') as any,
             smooth: true,
             getDirection: true,
-            lerp: 0.1,
+            getSpeed: true,
+            multiplier: 2
         });
-        // const scrollElement = new LocomotiveScroll({
-        //     el: ref.current as any,
-        //     smooth: true,
 
-        //     getDirection: true,
-        //     getSpeed: true,
-        //     scrollFromAnywhere: true
-        //     // multiplier: 10
-        // });
-        // scrollElement.on("scroll", (obj) => {
-
-        //     scroll.current.current = obj.scroll.y;
-        //     const distance = scroll.current.current - scroll.current.cache;
-        //     scroll.current.cache = scroll.current.current;
-        //     console.log(clamp(distance, -10, 10))
-        //     if (!showcaseRef.current) return;
-        //     showcaseRef.current.style.transform = `skewY(${clamp(distance, -10, 10)}deg)`;
-        // });
+        scrollRef.current.on("scroll", (obj) => {
+            updateScrollCompletion(obj);
+            console.log('height', document.body.clientHeight)
+            const distanceToFade = document.body.clientHeight * 0.1;
+            obj.scroll.y > distanceToFade ? videoContainerRef.current?.classList.add("opacity-0") : videoContainerRef.current?.classList.remove("opacity-0");
+            scroll.current.current = obj.scroll.y;
+            const distance = scroll.current.current - scroll.current.cache;
+            scroll.current.cache = scroll.current.current;
+            if (!showcaseRef.current) return;
+            showcaseRef.current.style.transform = `skewY(${clamp(distance, -2, 2)}deg)`;
+        });
 
         // Promise.all([preloadImages(".grid-item-media")]).then(() => {
-        //     scrollElement.update();
+        //     scrollRef.current?.update();
         // });
+
+
+        return () => {
+            // Destroy the scroll instance when the component is unmounted
+            if (scrollRef.current) {
+                scrollRef.current.destroy();
+            }
+        }
     }, []);
 
     return (
-        <>
-            {/* <div style={{ background: "linear-gradient(3deg, black, black, transparent)" }} className='w-full h-full bg-zinc-900 absolute z-0 grayscale'>
-                <video style={{ opacity: 0.005 }} className='w-full' muted={true} loop={true} playsInline={true} autoPlay={true} data-src="https://cdn.dribbble.com/users/32512/screenshots/17066462/media/a1b8991f197da384b56f9b17c7a47c51.mp4" data-video-small="https://cdn.dribbble.com/users/32512/screenshots/17066462/media/c82e623674257fc1a4b0589a41df18cb.mp4" data-video-medium="https://cdn.dribbble.com/users/32512/screenshots/17066462/media/ffc7f30e1bbc7eca8a4107d7e12fdbf8.mp4" data-video-large="https://cdn.dribbble.com/users/32512/screenshots/17066462/media/a1b8991f197da384b56f9b17c7a47c51.mp4" src="https://cdn.dribbble.com/users/32512/screenshots/17066462/media/a1b8991f197da384b56f9b17c7a47c51.mp4"></video>
-            </div> */}
-            <div ref={ref} id="scrollArea" className='flex justify-center bg-zinc-900' data-scroll-container>
-                <div className='container px-12 md:px-0' data-scroll-section>
-                    <div className='py-52' data-scroll data-scroll-speed="2">
-                        <span className='prose prose-2xl font-bold uppercase'>Projects</span>
-                        <div className='flex justify-center mt-10'>
-                            <DownArrow></DownArrow>
-                        </div>
-                    </div>
-                    <div ref={showcaseRef} className='lg:space-y-[70rem] middle-column' data-scroll-section >
-                        {projects.map((project, index) => {
-                            return (
-                                <div className='text-left transition-all duration-700 lg:skew-y-1 hover:skew-y-0' key={index} data-scroll  >
-                                    <span style={{ color: project.color }} className='prose prose-5xl font-black uppercase'>{project.title}</span>
-                                    <CoverImage src={project.imgSrc}></CoverImage>
-                                </div>
-                            )
-                        })}
-                    </div>
-
-                </div>
+        <div id="scroll-container" style={{ backgroundColor: "#01050c" }} className='h-[8000px] flex justify-center' data-scroll-container>
+            {/* <span
+                style={{ transform: `translateX(${completion - 100}%)`, backgroundColor: "#d40749" }}
+                className="absolute bg-yellow-400 h-1 w-full top-0 z-10"
+            /> */}
+            <a href="https://sherpas.se" target={"_blank"} className='absolute z-10 top-0 left-0 p-5'>
+                <img width={100} src="../../images/Sherpas_H_neg.png"></img>
+            </a>
+            <div ref={videoContainerRef} className='bg-zinc-900 w-full h-full absolute z-0 grayscale transition-all duration-700'>
+                <video style={{ opacity: 0.005 }} className='w-full' muted={true} loop={true} playsInline={true} autoPlay={true} data-src="../../images/hero-data-src.mp4" data-video-small="../../images/hero-small.mp4" data-video-medium="../../images/hero-medium.mp4" data-video-large="../../images/hero-large.mp4" src="../../images/hero-default.mp4"></video>
             </div>
+            <div className='container px-12 md:px-0' data-scroll-section>
+                <div className='h-screen grid place-content-center ' >
+                    <div className='grid grid-rows-2 text-left'>
+                        <span style={{ color: "#d40749" }} className='prose prose-ultraXL font-bold uppercase' data-scroll data-scroll-position="top">Pontus</span>
+                        <span className='prose prose-2xl uppercase' data-scroll data-scroll-speed="2">Selected work</span>
+                    </div>
+                    {/* <div className='flex justify-center mt-10'>
+                        <DownArrow></DownArrow>
+                    </div> */}
+                </div>
 
-        </>
-    )
+                <div ref={showcaseRef} className='lg:space-y-[50rem] middle-column' >
+                    {projects.map((project, index) => {
+                        return (
+                            <div className='text-left' key={index} data-scroll-position="top">
+                                <span style={{ color: project.color }} className='prose prose-5xl font-black uppercase' data-scroll data-scroll-position="bottom">{project.title}</span>
+                                <div id="distort" data-scroll data-scroll-speed="1" >
+                                    <CoverImage src={project.imgSrc} ></CoverImage>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+
+            </div>
+        </div >
+    );
 }
 
-export default Showcase
+export default Showcase;
